@@ -25,10 +25,6 @@
 
 static const char *TAG = "display";
 
-#define ST7701S_CMD_SDIR        0xC7
-#define ST7701S_SDIR_XFLIP      0x04
-#define ST7701S_MADCTL_ML       0x10
-
 /* Panel handle returned by ESP-IDF RGB driver */
 static esp_lcd_panel_handle_t s_panel = NULL;
 
@@ -113,6 +109,9 @@ static void st7701s_init_registers(void)
     spi_cmd(0xC2);              /* INVSET: inversion + frame rate */
     spi_dat(0x31);
     spi_dat(0x05);
+
+    spi_cmd(0xCD);
+    spi_dat(0x00);
 
     /* Positive gamma control */
     spi_cmd(0xB0);
@@ -216,32 +215,21 @@ static void st7701s_init_registers(void)
     spi_cmd(0xE5);
     spi_dat(0xE4);
 
-    /* ---- Return to page 0 and select the board-specific scan direction ---- */
+    /* ---- Return to page 0 for display mode configuration ---- */
     spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x10);
+    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
+
+    spi_cmd(0x21);              /* IPS mode */
 
     spi_cmd(0x3A);              /* COLMOD: RGB666, used by board references */
     spi_dat(0x60);
-
-    /*
-     * Match the Guition reference model:
-     *   - disable MDT flag for the 480x480 variant
-     *   - mirror both axes to match the panel scan direction
-     */
-    spi_cmd(0xCD);
-    spi_dat(0x00);
-
-    spi_cmd(0x36);              /* MADCTL: mirror Y, RGB color order */
-    spi_dat(ST7701S_MADCTL_ML);
-
-    spi_cmd(ST7701S_CMD_SDIR);  /* SDIR: mirror X for ST7701S */
-    spi_dat(ST7701S_SDIR_XFLIP);
 
     spi_cmd(0x11);              /* SLPOUT */
     vTaskDelay(pdMS_TO_TICKS(120));
 
     spi_cmd(0x29);              /* DISPON */
-    vTaskDelay(pdMS_TO_TICKS(50));
+
+    spi_cmd(0x20);              /* INVOFF */
 }
 
 /* ======================================================================
