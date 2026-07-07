@@ -39,6 +39,14 @@
 #define LCD_VFP            10   /* vertical front porch   */
 #define LCD_VSW            8    /* vertical sync width    */
 
+/* ---- RGB timing polarity flags ---------------------------------------- */
+/* HSYNC and VSYNC are active-high (idle low) on this panel.
+ * PCLK data is captured on the falling edge (active-neg).
+ * Verified against openHASP esp32-s3-4848S040.ini and LGFX_4848S040.h. */
+#define LCD_HSYNC_IDLE_LOW  1
+#define LCD_VSYNC_IDLE_LOW  1
+#define LCD_PCLK_ACTIVE_NEG 1
+
 /* ---- RGB parallel interface GPIOs ------------------------------------- */
 #define LCD_PCLK_GPIO      21
 #define LCD_VSYNC_GPIO     17

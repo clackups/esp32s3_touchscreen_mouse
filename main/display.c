@@ -215,21 +215,14 @@ static void st7701s_init_registers(void)
     spi_cmd(0xE5);
     spi_dat(0xE4);
 
-    /* ---- Return to page 0 for display mode configuration ---- */
+    /* ---- Return to page 0 ---- */
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
-
-    spi_cmd(0x21);              /* IPS mode */
-
-    spi_cmd(0x3A);              /* COLMOD: RGB666, used by board references */
-    spi_dat(0x60);
 
     spi_cmd(0x11);              /* SLPOUT */
     vTaskDelay(pdMS_TO_TICKS(120));
 
     spi_cmd(0x29);              /* DISPON */
-
-    spi_cmd(0x20);              /* INVOFF */
 }
 
 /* ======================================================================
@@ -303,6 +296,11 @@ int display_init(void)
             .vsync_back_porch   = LCD_VBP,
             .vsync_front_porch  = LCD_VFP,
             .vsync_pulse_width  = LCD_VSW,
+            .flags = {
+                .hsync_idle_low  = LCD_HSYNC_IDLE_LOW,
+                .vsync_idle_low  = LCD_VSYNC_IDLE_LOW,
+                .pclk_active_neg = LCD_PCLK_ACTIVE_NEG,
+            },
         },
         .flags = {
             .fb_in_psram = 1,
