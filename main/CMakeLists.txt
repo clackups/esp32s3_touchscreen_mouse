@@ -15,4 +15,6 @@ idf_component_register(
         log
         nvs_flash
         esp_tinyusb
+    PRIV_REQUIRES
+        esp_driver_ledc
 )
