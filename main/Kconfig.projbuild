@@ -11,7 +11,7 @@ menu "TOUCHSCREEN MOUSE"
             bool "Guition ESP32-4848S040C_I (4-inch 480x480)"
             help
                 Guition ESP32-S3-4848S040C_I: 4-inch 480x480 TFT with
-                ST7701S RGB display and CST820 capacitive touch controller.
+                ST7701S RGB display and GT911 capacitive touch controller.
                 References:
                   https://www.guition.com/esp32-display-module/4-inch-esp32s3-display-module
                   https://devices.esphome.io/devices/guition-esp32-s3-4848s040

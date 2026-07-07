@@ -26,7 +26,7 @@ The user interacts with a navigation area drawn on the touchscreen:
 
 | Device | Display | Touch |
 |---|---|---|
-| Guition ESP32-4848S040C_I | ST7701S 480x480 (16-bit RGB) | CST820 (I2C) |
+| Guition ESP32-4848S040C_I | ST7701S 480x480 (16-bit RGB) | GT911 (I2C) |
 
 Links:
 - https://www.guition.com/esp32-display-module/4-inch-esp32s3-display-module
@@ -83,7 +83,7 @@ esp32s3_touchscreen_mouse/
     +-- device_config.h    GPIO pin assignments per device
     +-- hid_mouse.h/.c     TinyUSB USB HID mouse
     +-- display.h/.c       ST7701S RGB display + drawing primitives
-    +-- touch.h/.c         CST820 I2C touch driver
+    +-- touch.h/.c         GT911 I2C touch driver
     +-- ui.h/.c            navigation area, buttons, mode state machine
     +-- main.c             entry point, FreeRTOS tasks
 ```

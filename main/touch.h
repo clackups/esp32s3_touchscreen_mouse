@@ -1,15 +1,10 @@
 /*
  * touch.h
  *
- * CST820 capacitive touch controller driver over I2C.
+ * GT911 capacitive touch controller driver over I2C.
  *
- * The CST820 is a single-point capacitive touch IC with an I2C interface.
- * It shares the register layout and I2C address (0x15) with the CST816S/D
- * family.
- *
- * The driver resets the touch IC, configures it for continuous reporting,
- * and provides a simple polling function that returns the current touch
- * state.
+ * The driver auto-detects the board's GT911 address, polls one touch point,
+ * and converts the raw controller state into DOWN / MOVE / UP events.
  */
 #pragma once
 
@@ -34,7 +29,7 @@ typedef struct {
 /*
  * touch_init
  *
- * Initialise the I2C bus and the CST820 touch controller.
+ * Initialise the I2C bus and the GT911 touch controller.
  * Must be called once before touch_read().
  * Returns 0 on success, non-zero on error.
  */
@@ -43,7 +38,7 @@ int touch_init(void);
 /*
  * touch_read
  *
- * Read the current touch state from the CST820.
+ * Read the current touch state from the GT911.
  * Fills *out with the latest event and coordinates.
  * Returns 0 on success, -1 on I2C error (previous data in *out is
  * left unchanged on error).

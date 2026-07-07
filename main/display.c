@@ -102,12 +102,12 @@ static void st7701s_init_registers(void)
     spi_dat(0x00);
 
     spi_cmd(0xC1);              /* PORCTRL: porch settings */
-    spi_dat(0x10);
-    spi_dat(0x0C);
+    spi_dat(0x0D);
+    spi_dat(0x02);
 
     spi_cmd(0xC2);              /* INVSET: inversion + frame rate */
-    spi_dat(0x07);
-    spi_dat(0x14);
+    spi_dat(0x31);
+    spi_dat(0x05);
 
     spi_cmd(0xCC);              /* RGBCTRL: RGB interface polarity */
     spi_dat(0x10);
@@ -134,10 +134,10 @@ static void st7701s_init_registers(void)
     spi_dat(0x60);
 
     spi_cmd(0xB1);              /* VCOM amplitude */
-    spi_dat(0x30);
+    spi_dat(0x32);
 
     spi_cmd(0xB2);              /* VGH voltage */
-    spi_dat(0x87);
+    spi_dat(0x07);
 
     spi_cmd(0xB3);              /* VGL voltage */
     spi_dat(0x80);
@@ -214,7 +214,13 @@ static void st7701s_init_registers(void)
     spi_cmd(0xE5);
     spi_dat(0xE4);
 
-    /* ---- Return to standard MIPI commands (BK disable) ---- */
+    /* ---- Return to page 0 and select the board-specific scan direction ---- */
+    spi_cmd(0xFF);
+    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x10);
+
+    spi_cmd(0xCD);
+    spi_dat(0x00);
+
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
 
