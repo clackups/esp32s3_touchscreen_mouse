@@ -1,0 +1,101 @@
+menu "TOUCHSCREEN MOUSE"
+
+    choice DEVICE_SELECTION
+        prompt "Target device"
+        default DEVICE_GUITION_4848S040
+        help
+            Select the ESP32-S3 board with touchscreen display that will be
+            used as the USB mouse HID device.
+
+        config DEVICE_GUITION_4848S040
+            bool "Guition ESP32-4848S040C_I (4-inch 480x480)"
+            help
+                Guition ESP32-S3-4848S040C_I: 4-inch 480x480 TFT with
+                ST7701S RGB display and CST820 capacitive touch controller.
+                References:
+                  https://www.guition.com/esp32-display-module/4-inch-esp32s3-display-module
+                  https://devices.esphome.io/devices/guition-esp32-s3-4848s040
+                  https://github.com/alaltitov/Guition-ESP32-S3-4848S040
+    endchoice
+
+    choice BUTTON_PANEL_SIDE
+        prompt "Side panel position"
+        default PANEL_SIDE_RIGHT
+        help
+            Choose which edge of the screen shows the mode buttons.
+
+        config PANEL_SIDE_RIGHT
+            bool "Right"
+        config PANEL_SIDE_LEFT
+            bool "Left"
+        config PANEL_SIDE_TOP
+            bool "Top"
+        config PANEL_SIDE_BOTTOM
+            bool "Bottom"
+    endchoice
+
+    comment "Colors are 16-bit RGB565 values (0xRRRRRGGGGGGBBBBB)"
+
+    config COLOR_BACKGROUND
+        hex "Background color (RGB565)"
+        default 0x0000
+        help
+            Screen background. Default: black (0x0000).
+
+    config COLOR_OUTLINE
+        hex "Outline / inactive element color (RGB565)"
+        default 0x0010
+        help
+            Color used for the navigation circle border and unselected
+            button borders. Default: navy blue (0x0010).
+            Navy blue #000080 => R5=0 G6=0 B5=16 => 0x0010.
+
+    config COLOR_ACTIVE
+        hex "Active / selected element color (RGB565)"
+        default 0x87F7
+        help
+            Color used for the currently active (toggled-on) button face
+            and the finger position indicator inside the navigation area.
+            Default: mint green (0x87F7).
+            Mint #80FFBE => R5=16 G6=63 B5=23 => 0x87F7.
+
+    config COLOR_FINGER
+        hex "Finger position dot color (RGB565)"
+        default 0xFFFF
+        help
+            Color of the small dot drawn at the current finger position
+            inside the navigation area. Default: white (0xFFFF).
+
+    config COLOR_TEXT
+        hex "Text / icon color (RGB565)"
+        default 0xFFFF
+        help
+            Color used for button labels and icons. Default: white (0xFFFF).
+
+    config MOUSE_SPEED_MAX
+        int "Maximum mouse movement per HID report (pixels)"
+        default 20
+        range 1 127
+        help
+            When the finger is at the edge of the navigation area the HID
+            report will carry this many movement units per axis.  Smaller
+            values give finer control; larger values give faster movement.
+
+    config TAP_RADIUS
+        int "Tap zone radius around navigation center (screen pixels)"
+        default 30
+        range 5 100
+        help
+            Touching the screen within this radius of the navigation center
+            and releasing quickly (without moving beyond the radius) is
+            interpreted as a left mouse button click.
+
+    config TAP_MAX_MS
+        int "Maximum tap duration for click detection (ms)"
+        default 300
+        range 50 1000
+        help
+            If a touch in the tap zone is released within this many
+            milliseconds it is treated as a click rather than a movement.
+
+endmenu
