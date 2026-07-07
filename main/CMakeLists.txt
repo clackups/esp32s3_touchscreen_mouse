@@ -14,5 +14,5 @@ idf_component_register(
         freertos
         log
         nvs_flash
-        tinyusb
+        esp_tinyusb
 )
