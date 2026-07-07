@@ -30,14 +30,14 @@
 #define LCD_H_RES          480
 #define LCD_V_RES          480
 
-/* ---- RGB timing (pixel clock ~12 MHz, 60 Hz frame rate) --------------- */
+/* ---- RGB timing (pixel clock ~12 MHz with board-tested porch values) --- */
 #define LCD_PIXEL_CLOCK_HZ (12 * 1000 * 1000)
-#define LCD_HBP            10   /* horizontal back porch  */
+#define LCD_HBP            50   /* horizontal back porch  */
 #define LCD_HFP            20   /* horizontal front porch */
-#define LCD_HSW            10   /* horizontal sync width  */
-#define LCD_VBP            10   /* vertical back porch    */
+#define LCD_HSW            8    /* horizontal sync width  */
+#define LCD_VBP            20   /* vertical back porch    */
 #define LCD_VFP            10   /* vertical front porch   */
-#define LCD_VSW            10   /* vertical sync width    */
+#define LCD_VSW            8    /* vertical sync width    */
 
 /* ---- RGB parallel interface GPIOs ------------------------------------- */
 #define LCD_PCLK_GPIO      21

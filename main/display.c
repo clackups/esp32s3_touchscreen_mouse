@@ -114,9 +114,6 @@ static void st7701s_init_registers(void)
     spi_dat(0x31);
     spi_dat(0x05);
 
-    spi_cmd(0xCC);              /* RGBCTRL: RGB interface polarity */
-    spi_dat(0x10);
-
     /* Positive gamma control */
     spi_cmd(0xB0);
     spi_dat(0x00); spi_dat(0x11); spi_dat(0x18); spi_dat(0x0E);
@@ -223,8 +220,8 @@ static void st7701s_init_registers(void)
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x10);
 
-    spi_cmd(0x3A);              /* COLMOD: 16-bit RGB565 */
-    spi_dat(0x55);
+    spi_cmd(0x3A);              /* COLMOD: RGB666, used by board references */
+    spi_dat(0x60);
 
     /*
      * Match the Guition reference model:

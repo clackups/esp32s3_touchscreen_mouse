@@ -11,6 +11,7 @@
 #include "device_config.h"
 
 #include <string.h>
+#include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -152,7 +153,10 @@ int touch_init(void)
         return -1;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(20));
+    gpio_set_drive_capability(TOUCH_I2C_SDA_GPIO, GPIO_DRIVE_CAP_3);
+    gpio_set_drive_capability(TOUCH_I2C_SCL_GPIO, GPIO_DRIVE_CAP_3);
+
+    vTaskDelay(pdMS_TO_TICKS(200));
 
     bool detected = false;
     for (int attempt = 0; attempt < GT911_PROBE_RETRIES; attempt++) {
