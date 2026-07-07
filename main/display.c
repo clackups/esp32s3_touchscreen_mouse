@@ -231,6 +231,13 @@ static void st7701s_init_registers(void)
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
 
+    /* 0x3A COLMOD: select 16-bit RGB565 pixel format.
+     * Must be sent after exiting Command2 and before Sleep-Out.
+     * Without this the ST7701S defaults to 18-bit mode on a 16-bit bus,
+     * producing wrong colours. */
+    spi_cmd(0x3A);
+    spi_dat(0x55);              /* 0x55 = RGB565 */
+
     spi_cmd(0x11);              /* SLPOUT */
     vTaskDelay(pdMS_TO_TICKS(120));
 

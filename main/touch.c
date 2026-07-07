@@ -39,6 +39,52 @@ static i2c_master_bus_handle_t s_i2c_bus = NULL;
 static i2c_master_dev_handle_t s_i2c_dev = NULL;
 
 /*
+ * i2c_bus_recover
+ *
+ * Perform a software I2C bus-recovery sequence on the touch controller pins.
+ * On a warm reset the GT911 may be left mid-transaction and holding SDA low.
+ * Clocking SCL nine times while SDA is high forces the device to release the
+ * bus, and a final STOP condition resets its I2C state machine.
+ * The ESP-IDF I2C master driver reconfigures the pins when the bus is created
+ * immediately afterwards, so no manual GPIO teardown is required here.
+ *
+ * Reference: I2C specification rev.6 section 3.1.16 (bus-stuck recovery).
+ */
+static void i2c_bus_recover(void)
+{
+    gpio_config_t io = {
+        .mode         = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+        .pin_bit_mask = (1ULL << TOUCH_I2C_SDA_GPIO) |
+                        (1ULL << TOUCH_I2C_SCL_GPIO),
+    };
+    gpio_config(&io);
+
+    /* Release both lines */
+    gpio_set_level(TOUCH_I2C_SDA_GPIO, 1);
+    gpio_set_level(TOUCH_I2C_SCL_GPIO, 1);
+    vTaskDelay(pdMS_TO_TICKS(1));
+
+    /* Clock SCL nine times to complete any partial byte in the slave */
+    for (int i = 0; i < 9; i++) {
+        gpio_set_level(TOUCH_I2C_SCL_GPIO, 0);
+        vTaskDelay(pdMS_TO_TICKS(1));
+        gpio_set_level(TOUCH_I2C_SCL_GPIO, 1);
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    /* Generate a STOP condition: SDA goes HIGH while SCL is HIGH */
+    gpio_set_level(TOUCH_I2C_SDA_GPIO, 0);
+    vTaskDelay(pdMS_TO_TICKS(1));
+    gpio_set_level(TOUCH_I2C_SCL_GPIO, 1);
+    vTaskDelay(pdMS_TO_TICKS(1));
+    gpio_set_level(TOUCH_I2C_SDA_GPIO, 1);
+    vTaskDelay(pdMS_TO_TICKS(1));
+}
+
+/*
  * i2c_read_regs16
  *
  * Read 'len' bytes from the selected touch controller starting at the
@@ -137,6 +183,11 @@ static int gt911_probe_address(uint8_t addr)
 int touch_init(void)
 {
     ESP_LOGI(TAG, "Initialising GT911 touch controller");
+
+    /* Recover the I2C bus before creating the master.  If the MCU was warm-
+     * reset while the GT911 was mid-transaction the device may be holding SDA
+     * low; the recovery sequence unblocks it before we set up the peripheral. */
+    i2c_bus_recover();
 
     i2c_master_bus_config_t bus_cfg = {
         .i2c_port = TOUCH_I2C_PORT,
