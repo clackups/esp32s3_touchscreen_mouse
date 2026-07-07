@@ -113,6 +113,18 @@ static void st7701s_init_registers(void)
     spi_cmd(0xCD);
     spi_dat(0x00);
 
+    /*
+     * 0xC3 RGBCTRL: tell the ST7701S how to interpret the RGB bus signals.
+     * Byte 0 bit-map (all zero for this board):
+     *   bit0 DEPOL   = 0 (DE active-high)
+     *   bit1 PCKPOL  = 0 (PCLK captures on rising edge from panel side)
+     *   bit2 HSPL    = 0 (HSYNC high polarity)
+     *   bit3 VSPL    = 0 (VSYNC high polarity)
+     * Bytes 1-2 are back-porch timing hints per the LovyanGFX reference.
+     */
+    spi_cmd(0xC3);
+    spi_dat(0x00); spi_dat(0x10); spi_dat(0x08);
+
     /* Positive gamma control */
     spi_cmd(0xB0);
     spi_dat(0x00); spi_dat(0x11); spi_dat(0x18); spi_dat(0x0E);
