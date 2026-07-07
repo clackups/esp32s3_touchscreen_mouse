@@ -11,6 +11,9 @@
  *
  * Axis directions follow the USB HID convention (positive X = right,
  * positive Y = down).
+ *
+ * Note: esp_tinyusb v2.x manages its own internal tud_task() loop.
+ * No external USB task is needed.
  */
 #pragma once
 
@@ -43,12 +46,3 @@ int hid_mouse_init(void);
  * Returns 0 if the report was accepted, -1 if the USB endpoint was busy.
  */
 int hid_mouse_send(uint8_t buttons, int8_t dx, int8_t dy, int8_t scroll);
-
-/*
- * hid_mouse_task
- *
- * FreeRTOS task that drives the TinyUSB device stack event loop.
- * Launch this task from app_main() once before calling hid_mouse_send().
- * Typical stack: 4096 bytes.  Priority: tskIDLE_PRIORITY + 1.
- */
-void hid_mouse_task(void *pvParameters);

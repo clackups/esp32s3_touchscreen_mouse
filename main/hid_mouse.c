@@ -3,9 +3,9 @@
  *
  * USB HID mouse implementation using the ESP-IDF TinyUSB integration.
  *
- * The USB descriptors (device, configuration, strings) are passed directly
- * to tinyusb_driver_install() so that they do not conflict with the weak/
- * strong symbol implementations inside the ESP-IDF TinyUSB wrapper.
+ * USB descriptors are passed into tinyusb_driver_install() via the v2.x
+ * nested tinyusb_desc_config_t sub-struct so they do not conflict with
+ * the default descriptor table built by the driver.
  *
  * Only the HID class callbacks are implemented here:
  *   tud_hid_descriptor_report_cb  - supply the report descriptor
@@ -20,6 +20,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "tinyusb.h"
+#include "tinyusb_default_config.h"
 #include "class/hid/hid_device.h"
 
 static const char *TAG = "hid_mouse";
@@ -98,9 +99,9 @@ static const tusb_desc_device_t s_desc_device = {
     .bDeviceClass       = 0x00,
     .bDeviceSubClass    = 0x00,
     .bDeviceProtocol    = 0x00,
-    .bMaxPacketSize0    = 64,                            /* CFG_TUD_ENDPOINT0_SIZE */
-    .idVendor           = CONFIG_TINYUSB_DESC_CUSTOM_VID,
-    .idProduct          = CONFIG_TINYUSB_DESC_CUSTOM_PID,
+    .bMaxPacketSize0    = 64,                   /* CFG_TUD_ENDPOINT0_SIZE */
+    .idVendor           = CONFIG_USB_VID,
+    .idProduct          = CONFIG_USB_PID,
     .bcdDevice          = 0x0100,
     .iManufacturer      = STRID_MANUFACTURER,
     .iProduct           = STRID_PRODUCT,
@@ -206,13 +207,16 @@ int hid_mouse_init(void)
 {
     ESP_LOGI(TAG, "Initialising TinyUSB HID mouse");
 
-    const tinyusb_config_t tusb_cfg = {
-        .device_descriptor      = &s_desc_device,
-        .string_descriptor      = s_string_descriptors,
-        .string_descriptor_count = STRID_COUNT,
-        .external_phy           = false,
-        .configuration_descriptor = s_desc_configuration,
-    };
+    /*
+     * esp_tinyusb v2.x: start from the default configuration and override
+     * only the descriptor sub-struct.  The driver creates its own internal
+     * tud_task() loop, so no external task is required.
+     */
+    tinyusb_config_t tusb_cfg = TINYUSB_DEFAULT_CONFIG();
+    tusb_cfg.descriptor.device           = &s_desc_device;
+    tusb_cfg.descriptor.string           = s_string_descriptors;
+    tusb_cfg.descriptor.string_count     = STRID_COUNT;
+    tusb_cfg.descriptor.full_speed_config = s_desc_configuration;
 
     esp_err_t err = tinyusb_driver_install(&tusb_cfg);
     if (err != ESP_OK) {
@@ -231,14 +235,4 @@ int hid_mouse_send(uint8_t buttons, int8_t dx, int8_t dy, int8_t scroll)
     }
     /* tud_hid_mouse_report(report_id, buttons, x, y, vertical, horizontal) */
     return tud_hid_mouse_report(0, buttons, dx, dy, scroll, 0) ? 0 : -1;
-}
-
-void hid_mouse_task(void *pvParameters)
-{
-    (void)pvParameters;
-    ESP_LOGI(TAG, "USB device task started");
-    while (1) {
-        tud_task();
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
 }

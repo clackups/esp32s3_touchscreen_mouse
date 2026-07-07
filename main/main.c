@@ -8,8 +8,10 @@
  *   2. Initialise the display (ST7701S RGB panel).
  *   3. Initialise the touch controller (CST820 I2C).
  *   4. Draw the initial UI.
- *   5. Start the USB device task.
- *   6. Enter the main touch polling loop.
+ *   5. Enter the main touch polling loop.
+ *
+ * Note: the TinyUSB event loop is managed internally by esp_tinyusb v2.x.
+ * No separate USB task needs to be created by the application.
  */
 
 #include <stdio.h>
@@ -24,17 +26,6 @@
 
 static const char *TAG = "main";
 
-/*
- * hid_task_wrapper
- *
- * Thin FreeRTOS task wrapper around hid_mouse_task() so that it can be
- * started with xTaskCreate().
- */
-static void hid_task_wrapper(void *pvParameters)
-{
-    hid_mouse_task(pvParameters);
-}
-
 void app_main(void)
 {
     ESP_LOGI(TAG, "ESP32-S3 Touchscreen Mouse starting");
@@ -44,13 +35,6 @@ void app_main(void)
         ESP_LOGE(TAG, "HID mouse init failed");
         return;
     }
-
-    /* Start TinyUSB event loop in a dedicated task */
-    xTaskCreate(hid_task_wrapper, "usb_hid",
-                4096,        /* stack size */
-                NULL,
-                tskIDLE_PRIORITY + 2,
-                NULL);
 
     /* ---- Display ---- */
     if (display_init() != 0) {

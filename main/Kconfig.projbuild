@@ -98,4 +98,18 @@ menu "TOUCHSCREEN MOUSE"
             If a touch in the tap zone is released within this many
             milliseconds it is treated as a click rather than a movement.
 
+    comment "USB device identity (HID mouse)"
+
+    config USB_VID
+        hex "USB Vendor ID"
+        default 0x303A
+        help
+            USB Vendor ID reported to the host. Default: 0x303A (Espressif).
+
+    config USB_PID
+        hex "USB Product ID"
+        default 0x4002
+        help
+            USB Product ID reported to the host. Default: 0x4002.
+
 endmenu
