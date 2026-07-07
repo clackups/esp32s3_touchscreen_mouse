@@ -20,6 +20,8 @@ static const char *TAG = "touch";
 
 /* I2C read/write timeout */
 #define I2C_TIMEOUT_MS          50
+#define GT911_PROBE_RETRIES     10
+#define GT911_PROBE_DELAY_MS    50
 
 /* GT911 register addresses */
 #define GT911_REG_PRODUCT_ID    0x8140
@@ -152,8 +154,18 @@ int touch_init(void)
 
     vTaskDelay(pdMS_TO_TICKS(20));
 
-    if (gt911_probe_address(TOUCH_I2C_ADDR_1) != 0 &&
-        gt911_probe_address(TOUCH_I2C_ADDR_2) != 0) {
+    bool detected = false;
+    for (int attempt = 0; attempt < GT911_PROBE_RETRIES; attempt++) {
+        if (gt911_probe_address(TOUCH_I2C_ADDR_1) == 0 ||
+            gt911_probe_address(TOUCH_I2C_ADDR_2) == 0) {
+            detected = true;
+            break;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(GT911_PROBE_DELAY_MS));
+    }
+
+    if (!detected) {
         ESP_LOGE(TAG, "Could not detect GT911 at 0x%02X or 0x%02X",
                  TOUCH_I2C_ADDR_1, TOUCH_I2C_ADDR_2);
         return -1;

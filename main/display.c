@@ -25,6 +25,10 @@
 
 static const char *TAG = "display";
 
+#define ST7701S_CMD_SDIR        0xC7
+#define ST7701S_SDIR_XFLIP      0x04
+#define ST7701S_MADCTL_ML       0x10
+
 /* Panel handle returned by ESP-IDF RGB driver */
 static esp_lcd_panel_handle_t s_panel = NULL;
 
@@ -219,17 +223,22 @@ static void st7701s_init_registers(void)
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x10);
 
-    spi_cmd(0xCD);
-    spi_dat(0x00);
-
-    spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
-
     spi_cmd(0x3A);              /* COLMOD: 16-bit RGB565 */
     spi_dat(0x55);
 
-    spi_cmd(0x36);              /* MADCTL: normal scan order, RGB */
+    /*
+     * Match the Guition reference model:
+     *   - disable MDT flag for the 480x480 variant
+     *   - mirror both axes to match the panel scan direction
+     */
+    spi_cmd(0xCD);
     spi_dat(0x00);
+
+    spi_cmd(0x36);              /* MADCTL: mirror Y, RGB color order */
+    spi_dat(ST7701S_MADCTL_ML);
+
+    spi_cmd(ST7701S_CMD_SDIR);  /* SDIR: mirror X for ST7701S */
+    spi_dat(ST7701S_SDIR_XFLIP);
 
     spi_cmd(0x11);              /* SLPOUT */
     vTaskDelay(pdMS_TO_TICKS(120));
@@ -348,6 +357,7 @@ int display_init(void)
 
     /* Clear screen to background color */
     draw_fill(COLOR_BACKGROUND);
+    display_flush();
 
     ESP_LOGI(TAG, "Display ready, fb=%p", (void *)s_fb);
     return 0;

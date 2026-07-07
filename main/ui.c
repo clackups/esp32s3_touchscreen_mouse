@@ -377,6 +377,8 @@ void ui_init(void)
         draw_button(i, 0);
     }
 
+    display_flush();
+
     ESP_LOGI(TAG, "UI initialised");
 }
 
@@ -544,9 +546,5 @@ void ui_process_touch(const touch_data_t *td)
 
 void ui_refresh(void)
 {
-    /*
-     * Currently all drawing is done immediately inside ui_process_touch().
-     * This function is reserved for future double-buffered or dirty-region
-     * rendering strategies.
-     */
+    display_flush();
 }
