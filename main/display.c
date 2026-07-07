@@ -39,6 +39,7 @@ static uint16_t *s_fb = NULL;
  * spi_init_pins
  *
  * Configure the three bit-bang SPI pins as GPIO outputs.
+ * The Guition panel expects the ST7701S command bus in SPI mode 3.
  */
 static void spi_init_pins(void)
 {
@@ -53,14 +54,14 @@ static void spi_init_pins(void)
     };
     gpio_config(&io);
     gpio_set_level(LCD_SPI_CS_GPIO,   1);
-    gpio_set_level(LCD_SPI_SCK_GPIO,  0);
+    gpio_set_level(LCD_SPI_SCK_GPIO,  1);
     gpio_set_level(LCD_SPI_MOSI_GPIO, 0);
 }
 
 /*
  * spi_write9
  *
- * Transmit one 9-bit word (MSB first).
+ * Transmit one 9-bit word (MSB first) in SPI mode 3.
  * bit 8 = 0 selects "command", bit 8 = 1 selects "data".
  */
 static void spi_write9(uint16_t word9)
@@ -68,8 +69,8 @@ static void spi_write9(uint16_t word9)
     gpio_set_level(LCD_SPI_CS_GPIO, 0);
     for (int bit = 8; bit >= 0; bit--) {
         gpio_set_level(LCD_SPI_MOSI_GPIO, (word9 >> bit) & 1);
-        gpio_set_level(LCD_SPI_SCK_GPIO, 1);
         gpio_set_level(LCD_SPI_SCK_GPIO, 0);
+        gpio_set_level(LCD_SPI_SCK_GPIO, 1);
     }
     gpio_set_level(LCD_SPI_CS_GPIO, 1);
 }
