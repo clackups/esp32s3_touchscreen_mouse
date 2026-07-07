@@ -326,11 +326,11 @@ int display_init(void)
         return -1;
     }
 
-    err = esp_lcd_panel_disp_on_off(s_panel, true);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "panel disp on failed: %s", esp_err_to_name(err));
-        return -1;
-    }
+    /*
+     * esp_lcd_panel_disp_on_off is not supported by the RGB panel driver
+     * when disp_gpio_num = -1.  Display enable is handled by the DE/HSYNC/
+     * VSYNC signals, so no explicit on/off call is needed here.
+     */
 
     /* Obtain framebuffer pointer */
     err = esp_lcd_rgb_panel_get_frame_buffer(s_panel, 1, (void **)&s_fb);
