@@ -277,7 +277,6 @@ int display_init(void)
     /* Create the ESP-IDF RGB panel */
     esp_lcd_rgb_panel_config_t panel_cfg = {
         .data_width       = 16,
-        .psram_trans_align = 64,
         .num_fbs          = 1,
         .clk_src          = LCD_CLK_SRC_DEFAULT,
         .disp_gpio_num    = -1,
