@@ -6,8 +6,8 @@
  * Startup sequence:
  *   1. Initialise USB HID mouse (TinyUSB).
  *   2. Initialise the display (ST7701S RGB panel).
- *   3. Initialise the touch controller (GT911 I2C).
- *   4. Draw the initial UI.
+ *   3. Draw the initial UI.
+ *   4. Initialise the touch controller (GT911 I2C).
  *   5. Enter the main touch polling loop.
  *
  * Note: the TinyUSB event loop is managed internally by esp_tinyusb v2.x.
