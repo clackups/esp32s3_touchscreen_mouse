@@ -15,6 +15,7 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -42,14 +43,14 @@ void app_main(void)
         return;
     }
 
-    /* ---- Touch ---- */
-    if (touch_init() != 0) {
-        ESP_LOGE(TAG, "Touch init failed");
-        return;
-    }
-
     /* ---- UI ---- */
     ui_init();
+
+    /* ---- Touch ---- */
+    bool touch_ready = (touch_init() == 0);
+    if (!touch_ready) {
+        ESP_LOGE(TAG, "Touch init failed, continuing without touch input");
+    }
 
     ESP_LOGI(TAG, "All subsystems ready.  Entering touch loop.");
 
@@ -57,7 +58,7 @@ void app_main(void)
     touch_data_t td = { .event = TOUCH_EVENT_NONE, .x = 0, .y = 0 };
 
     while (1) {
-        if (touch_read(&td) == 0) {
+        if (touch_ready && touch_read(&td) == 0) {
             ui_process_touch(&td);
         }
 
