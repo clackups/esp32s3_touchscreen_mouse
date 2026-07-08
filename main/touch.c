@@ -5,6 +5,13 @@
  *
  * The Guition ESP32-4848S040 board exposes the touch controller over I2C.
  * The controller stores its status and coordinates in a 16-bit register map.
+ *
+ * GT911 I2C address selection:
+ *   The GT911 samples its INT pin at power-on to choose its I2C address.
+ *   INT low  -> 0x5D,  INT high -> 0x14.
+ *   On this board both RST and INT are left unconnected (NC); both addresses
+ *   are tried at init time.  A full bus scan is performed on failure to aid
+ *   diagnosis if the device is present at an unexpected address.
  */
 
 #include "touch.h"
@@ -21,6 +28,8 @@ static const char *TAG = "touch";
 
 /* I2C read/write timeout */
 #define I2C_TIMEOUT_MS          50
+/* Short timeout for i2c_master_probe: only needs one address byte round-trip */
+#define I2C_PROBE_TIMEOUT_MS    10
 #define GT911_PROBE_RETRIES     10
 #define GT911_PROBE_DELAY_MS    50
 
@@ -142,9 +151,19 @@ static int gt911_clear_status(void)
  * gt911_probe_address
  *
  * Probe one possible GT911 I2C address and log the product ID on success.
+ * Uses i2c_master_probe first (fast ACK/NACK check) to avoid spending the
+ * full I2C_TIMEOUT_MS on every absent address during the retry loop.
  */
 static int gt911_probe_address(uint8_t addr)
 {
+    /* Quick address presence check -- fails in ~100 us on NACK */
+    esp_err_t err = i2c_master_probe(s_i2c_bus, addr, I2C_PROBE_TIMEOUT_MS);
+    if (err != ESP_OK) {
+        ESP_LOGD(TAG, "0x%02X not present (%s)", addr, esp_err_to_name(err));
+        return -1;
+    }
+
+    /* Device ACK'd: create a handle and read the 4-byte product ID */
     uint8_t product_id[4];
     char product_id_text[5];
 
@@ -155,14 +174,16 @@ static int gt911_probe_address(uint8_t addr)
     };
 
     i2c_master_dev_handle_t dev = NULL;
-    esp_err_t err = i2c_master_bus_add_device(s_i2c_bus, &dev_cfg, &dev);
+    err = i2c_master_bus_add_device(s_i2c_bus, &dev_cfg, &dev);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "0x%02X: add_device failed: %s", addr, esp_err_to_name(err));
         return -1;
     }
 
     s_i2c_dev = dev;
     if (i2c_read_regs16(addr, GT911_REG_PRODUCT_ID, product_id,
                         sizeof(product_id)) != 0) {
+        ESP_LOGE(TAG, "0x%02X: product ID read failed", addr);
         i2c_master_bus_rm_device(dev);
         s_i2c_dev = NULL;
         return -1;
@@ -174,6 +195,29 @@ static int gt911_probe_address(uint8_t addr)
     s_touch_addr = addr;
     ESP_LOGI(TAG, "GT911 product ID: %s (addr 0x%02X)", product_id_text, addr);
     return 0;
+}
+
+/*
+ * gt911_scan_bus
+ *
+ * Scan all standard I2C addresses and log every device that ACKs.  Called
+ * only when normal GT911 detection fails, to help diagnose wiring issues
+ * (wrong address, bus stuck, no pull-ups, wrong GPIO assignment).
+ */
+static void gt911_scan_bus(void)
+{
+    ESP_LOGW(TAG, "Scanning I2C bus for devices (SDA=%d SCL=%d)...",
+             TOUCH_I2C_SDA_GPIO, TOUCH_I2C_SCL_GPIO);
+    bool found = false;
+    for (uint8_t a = 0x01; a < 0x78; a++) {
+        if (i2c_master_probe(s_i2c_bus, a, I2C_PROBE_TIMEOUT_MS) == ESP_OK) {
+            ESP_LOGW(TAG, "  I2C device at 0x%02X", a);
+            found = true;
+        }
+    }
+    if (!found) {
+        ESP_LOGE(TAG, "  No I2C devices found -- check SDA/SCL wiring and pull-ups");
+    }
 }
 
 /* ======================================================================
@@ -207,7 +251,7 @@ int touch_init(void)
     gpio_set_drive_capability(TOUCH_I2C_SDA_GPIO, GPIO_DRIVE_CAP_3);
     gpio_set_drive_capability(TOUCH_I2C_SCL_GPIO, GPIO_DRIVE_CAP_3);
 
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     bool detected = false;
     for (int attempt = 0; attempt < GT911_PROBE_RETRIES; attempt++) {
@@ -223,6 +267,7 @@ int touch_init(void)
     if (!detected) {
         ESP_LOGE(TAG, "Could not detect GT911 at 0x%02X or 0x%02X",
                  TOUCH_I2C_ADDR_1, TOUCH_I2C_ADDR_2);
+        gt911_scan_bus();
         return -1;
     }
 

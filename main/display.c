@@ -231,13 +231,6 @@ static void st7701s_init_registers(void)
     spi_cmd(0xFF);
     spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
 
-    /* 0x3A COLMOD: select 16-bit RGB565 pixel format.
-     * Must be sent after exiting Command2 and before Sleep-Out.
-     * Without this the ST7701S defaults to 18-bit mode on a 16-bit bus,
-     * producing wrong colours. */
-    spi_cmd(0x3A);
-    spi_dat(0x55);              /* 0x55 = RGB565 */
-
     spi_cmd(0x11);              /* SLPOUT */
     vTaskDelay(pdMS_TO_TICKS(120));
 
@@ -289,9 +282,18 @@ int display_init(void)
 
     /* Create the ESP-IDF RGB panel */
     esp_lcd_rgb_panel_config_t panel_cfg = {
-        .data_width       = 16,
-        .num_fbs          = 1,
-        .clk_src          = LCD_CLK_SRC_DEFAULT,
+        .data_width            = 16,
+        .num_fbs               = 1,
+        /*
+         * bounce_buffer_size_px: allocate a small SRAM bounce buffer so the
+         * DMA engine does not read directly from PSRAM over the AHB bus.
+         * Direct PSRAM DMA can stall under heavy PSRAM traffic (QSPI flash
+         * + framebuffer reads at the same time), producing garbled display
+         * lines.  10 lines of buffer (9600 B) fits comfortably in internal
+         * SRAM and eliminates these artefacts.
+         */
+        .bounce_buffer_size_px = LCD_H_RES * 10,
+        .clk_src               = LCD_CLK_SRC_DEFAULT,
         .disp_gpio_num    = -1,
         .pclk_gpio_num    = LCD_PCLK_GPIO,
         .vsync_gpio_num   = LCD_VSYNC_GPIO,
