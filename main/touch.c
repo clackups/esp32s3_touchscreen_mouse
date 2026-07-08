@@ -58,11 +58,19 @@ static i2c_master_dev_handle_t s_i2c_dev = NULL;
  * immediately afterwards, so no manual GPIO teardown is required here.
  *
  * Reference: I2C specification rev.6 section 3.1.16 (bus-stuck recovery).
+ *
+ * Returns true if the bus is free (SDA HIGH) after recovery, false if SDA
+ * remains LOW (indicating a hardware problem: missing pull-ups, short to GND,
+ * or touch controller not powered).
  */
-static void i2c_bus_recover(void)
+static bool i2c_bus_recover(void)
 {
+    /*
+     * Use INPUT_OUTPUT_OD so the input buffer is active and gpio_get_level()
+     * returns the real pin voltage rather than the output latch value.
+     */
     gpio_config_t io = {
-        .mode         = GPIO_MODE_OUTPUT_OD,
+        .mode         = GPIO_MODE_INPUT_OUTPUT_OD,
         .pull_up_en   = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
@@ -91,6 +99,24 @@ static void i2c_bus_recover(void)
     vTaskDelay(pdMS_TO_TICKS(1));
     gpio_set_level(TOUCH_I2C_SDA_GPIO, 1);
     vTaskDelay(pdMS_TO_TICKS(1));
+
+    /*
+     * Read the actual SDA pin level.  With internal pull-up and no device
+     * pulling the line low, SDA must be HIGH.  If it is still LOW the bus is
+     * hardware-stuck (no external pull-ups, line shorted to GND, or touch
+     * controller unpowered) and no amount of software retries will help.
+     */
+    int sda_level = gpio_get_level(TOUCH_I2C_SDA_GPIO);
+    if (sda_level == 0) {
+        ESP_LOGE(TAG, "I2C SDA stuck LOW after bus recovery "
+                 "(SDA=GPIO%d SCL=GPIO%d) -- "
+                 "check pull-ups, wiring and touch controller power",
+                 TOUCH_I2C_SDA_GPIO, TOUCH_I2C_SCL_GPIO);
+        return false;
+    }
+
+    ESP_LOGD(TAG, "I2C bus free after recovery (SDA HIGH)");
+    return true;
 }
 
 /*
@@ -230,8 +256,12 @@ int touch_init(void)
 
     /* Recover the I2C bus before creating the master.  If the MCU was warm-
      * reset while the GT911 was mid-transaction the device may be holding SDA
-     * low; the recovery sequence unblocks it before we set up the peripheral. */
-    i2c_bus_recover();
+     * low; the recovery sequence unblocks it before we set up the peripheral.
+     * If SDA is still LOW after recovery the bus is hardware-stuck -- bail out
+     * immediately rather than waiting through many fruitless probe timeouts. */
+    if (!i2c_bus_recover()) {
+        return -1;
+    }
 
     i2c_master_bus_config_t bus_cfg = {
         .i2c_port = TOUCH_I2C_PORT,
