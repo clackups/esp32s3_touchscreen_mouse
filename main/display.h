@@ -1,7 +1,7 @@
 /*
  * display.h
  *
- * Display initialisation and 2-D drawing primitives for the ST7701S
+ * Display initialisation and 2-D drawing primitives for the target
  * RGB parallel LCD panel.
  *
  * All drawing functions operate on an internal framebuffer that lives in
@@ -19,7 +19,7 @@
 /*
  * display_init
  *
- * Initialise the ST7701S panel and bring up the RGB interface.
+ * Initialise the RGB panel and bring up the RGB interface.
  * Must be called once before any drawing function.
  * Returns 0 on success, non-zero on error.
  */

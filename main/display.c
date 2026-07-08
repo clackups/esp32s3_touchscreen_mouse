@@ -1,10 +1,10 @@
 /*
  * display.c
  *
- * ST7701S display driver and 2-D drawing functions.
+ * RGB display driver and 2-D drawing functions.
  *
  * Initialisation flow:
- *   1. Configure the ST7701S via 9-bit 3-wire SPI (bit-banged).
+ *   1. Configure LEDC backlight output.
  *   2. Create the ESP-IDF RGB panel and start DMA output.
  *   3. Return a pointer to the framebuffer for direct pixel access.
  */
@@ -18,10 +18,7 @@
 #include "esp_log.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
-#include "driver/gpio.h"
 #include "driver/ledc.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 static const char *TAG = "display";
 
@@ -32,210 +29,11 @@ static esp_lcd_panel_handle_t s_panel = NULL;
 static uint16_t *s_fb = NULL;
 
 /* ======================================================================
- * 3-wire 9-bit SPI (bit-banged) for ST7701S register initialisation
+ * NOTE (VIEWE UEDX80480043E-WB-A):
+ * This board uses an 800x480 RGB panel and does not expose a separate
+ * 3-wire command channel for controller register programming in this project.
+ * The panel is driven directly by the ESP-IDF RGB peripheral configuration.
  * ====================================================================== */
-
-/*
- * spi_init_pins
- *
- * Configure the three bit-bang SPI pins as GPIO outputs.
- * The Guition panel expects the ST7701S command bus in SPI mode 3.
- */
-static void spi_init_pins(void)
-{
-    gpio_config_t io = {
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-        .pin_bit_mask = (1ULL << LCD_SPI_CS_GPIO)  |
-                        (1ULL << LCD_SPI_SCK_GPIO)  |
-                        (1ULL << LCD_SPI_MOSI_GPIO),
-    };
-    gpio_config(&io);
-    gpio_set_level(LCD_SPI_CS_GPIO,   1);
-    gpio_set_level(LCD_SPI_SCK_GPIO,  1);
-    gpio_set_level(LCD_SPI_MOSI_GPIO, 0);
-}
-
-/*
- * spi_write9
- *
- * Transmit one 9-bit word (MSB first) in SPI mode 3.
- * bit 8 = 0 selects "command", bit 8 = 1 selects "data".
- */
-static void spi_write9(uint16_t word9)
-{
-    gpio_set_level(LCD_SPI_CS_GPIO, 0);
-    for (int bit = 8; bit >= 0; bit--) {
-        gpio_set_level(LCD_SPI_MOSI_GPIO, (word9 >> bit) & 1);
-        gpio_set_level(LCD_SPI_SCK_GPIO, 0);
-        gpio_set_level(LCD_SPI_SCK_GPIO, 1);
-    }
-    gpio_set_level(LCD_SPI_CS_GPIO, 1);
-}
-
-static inline void spi_cmd(uint8_t cmd)  { spi_write9((uint16_t)cmd);          }
-static inline void spi_dat(uint8_t data) { spi_write9((uint16_t)(0x100 | data)); }
-
-/* ======================================================================
- * ST7701S register initialisation sequence for 480x480
- * ====================================================================== */
-
-static void st7701s_reset(void)
-{
-    /*
-     * The Guition board does not expose a dedicated display reset GPIO;
-     * perform a software reset instead and give the panel time to recover.
-     */
-    spi_cmd(0x01); /* SWRESET */
-    vTaskDelay(pdMS_TO_TICKS(120));
-}
-
-static void st7701s_init_registers(void)
-{
-    /* ---- Command2 BK0 (general panel settings) ---- */
-    spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x10);
-
-    spi_cmd(0xC0);              /* LNSET: display lines */
-    spi_dat(0x3B);              /* (0x3B+1)*8 = 480 lines */
-    spi_dat(0x00);
-
-    spi_cmd(0xC1);              /* PORCTRL: porch settings */
-    spi_dat(0x0D);
-    spi_dat(0x02);
-
-    spi_cmd(0xC2);              /* INVSET: inversion + frame rate */
-    spi_dat(0x31);
-    spi_dat(0x05);
-
-    spi_cmd(0xCD);
-    spi_dat(0x00);
-
-    /*
-     * 0xC3 RGBCTRL: tell the ST7701S how to interpret the RGB bus signals.
-     * Byte 0 bit-map (all zero for this board):
-     *   bit0 DEPOL   = 0 (DE active-high)
-     *   bit1 PCKPOL  = 0 (PCLK captures on rising edge from panel side)
-     *   bit2 HSPL    = 0 (HSYNC high polarity)
-     *   bit3 VSPL    = 0 (VSYNC high polarity)
-     * Bytes 1-2 are back-porch timing hints per the LovyanGFX reference.
-     */
-    spi_cmd(0xC3);
-    spi_dat(0x00); spi_dat(0x10); spi_dat(0x08);
-
-    /* Positive gamma control */
-    spi_cmd(0xB0);
-    spi_dat(0x00); spi_dat(0x11); spi_dat(0x18); spi_dat(0x0E);
-    spi_dat(0x11); spi_dat(0x06); spi_dat(0x07); spi_dat(0x08);
-    spi_dat(0x07); spi_dat(0x22); spi_dat(0x04); spi_dat(0x12);
-    spi_dat(0x0F); spi_dat(0xAA); spi_dat(0x31); spi_dat(0x18);
-
-    /* Negative gamma control */
-    spi_cmd(0xB1);
-    spi_dat(0x00); spi_dat(0x11); spi_dat(0x19); spi_dat(0x0E);
-    spi_dat(0x12); spi_dat(0x07); spi_dat(0x08); spi_dat(0x08);
-    spi_dat(0x08); spi_dat(0x22); spi_dat(0x04); spi_dat(0x11);
-    spi_dat(0x11); spi_dat(0xA9); spi_dat(0x32); spi_dat(0x18);
-
-    /* ---- Command2 BK1 (power / bias) ---- */
-    spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x11);
-
-    spi_cmd(0xB0);              /* VOP amplitude */
-    spi_dat(0x60);
-
-    spi_cmd(0xB1);              /* VCOM amplitude */
-    spi_dat(0x32);
-
-    spi_cmd(0xB2);              /* VGH voltage */
-    spi_dat(0x07);
-
-    spi_cmd(0xB3);              /* VGL voltage */
-    spi_dat(0x80);
-
-    spi_cmd(0xB5);              /* VGSP amplitude */
-    spi_dat(0x49);
-
-    spi_cmd(0xB7);              /* DCDCM control */
-    spi_dat(0x85);
-
-    spi_cmd(0xB8);              /* DCDC2 control */
-    spi_dat(0x21);
-
-    spi_cmd(0xC1);              /* source pre-charge */
-    spi_dat(0x78);
-
-    spi_cmd(0xC2);              /* source EQ control */
-    spi_dat(0x78);
-
-    spi_cmd(0xE0);              /* SUNLIGHT (VGSP) */
-    spi_dat(0x00); spi_dat(0x1B); spi_dat(0x02);
-
-    spi_cmd(0xE1);              /* VGSP oscillator frequency */
-    spi_dat(0x08); spi_dat(0xA0); spi_dat(0x00); spi_dat(0x00);
-    spi_dat(0x07); spi_dat(0xA0); spi_dat(0x00); spi_dat(0x00);
-    spi_dat(0x00); spi_dat(0x44); spi_dat(0x44);
-
-    spi_cmd(0xE2);
-    spi_dat(0x11); spi_dat(0x11); spi_dat(0x44); spi_dat(0x44);
-    spi_dat(0xED); spi_dat(0xA0); spi_dat(0x00); spi_dat(0x00);
-    spi_dat(0xEC); spi_dat(0xA0); spi_dat(0x00); spi_dat(0x00);
-
-    spi_cmd(0xE3);
-    spi_dat(0x00); spi_dat(0x00); spi_dat(0x11); spi_dat(0x11);
-
-    spi_cmd(0xE4);
-    spi_dat(0x44); spi_dat(0x44);
-
-    spi_cmd(0xE5);
-    spi_dat(0x0A); spi_dat(0xE9); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x0C); spi_dat(0xEB); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x0E); spi_dat(0xED); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x10); spi_dat(0xEF); spi_dat(0xD8); spi_dat(0xA0);
-
-    spi_cmd(0xE6);
-    spi_dat(0x00); spi_dat(0x00); spi_dat(0x11); spi_dat(0x11);
-
-    spi_cmd(0xE7);
-    spi_dat(0x44); spi_dat(0x44);
-
-    spi_cmd(0xE8);
-    spi_dat(0x09); spi_dat(0xE8); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x0B); spi_dat(0xEA); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x0D); spi_dat(0xEC); spi_dat(0xD8); spi_dat(0xA0);
-    spi_dat(0x0F); spi_dat(0xEE); spi_dat(0xD8); spi_dat(0xA0);
-
-    spi_cmd(0xEB);
-    spi_dat(0x02); spi_dat(0x00); spi_dat(0xE4); spi_dat(0xE4);
-    spi_dat(0x88); spi_dat(0x00); spi_dat(0x40);
-
-    spi_cmd(0xEC);
-    spi_dat(0x3C); spi_dat(0x00);
-
-    spi_cmd(0xED);
-    spi_dat(0xAB); spi_dat(0x89); spi_dat(0x76); spi_dat(0x54);
-    spi_dat(0x02); spi_dat(0xFF); spi_dat(0xFF); spi_dat(0xFF);
-    spi_dat(0xFF); spi_dat(0xFF); spi_dat(0xFF); spi_dat(0x20);
-    spi_dat(0x45); spi_dat(0x67); spi_dat(0x98); spi_dat(0xBA);
-
-    /* ---- Command2 BK3 ---- */
-    spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x13);
-
-    spi_cmd(0xE5);
-    spi_dat(0xE4);
-
-    /* ---- Return to page 0 ---- */
-    spi_cmd(0xFF);
-    spi_dat(0x77); spi_dat(0x01); spi_dat(0x00); spi_dat(0x00); spi_dat(0x00);
-
-    spi_cmd(0x11);              /* SLPOUT */
-    vTaskDelay(pdMS_TO_TICKS(120));
-
-    spi_cmd(0x29);              /* DISPON */
-}
 
 /* ======================================================================
  * Backlight
@@ -274,11 +72,6 @@ int display_init(void)
 
     /* Bring up backlight */
     backlight_init();
-
-    /* Send register init via bit-bang SPI */
-    spi_init_pins();
-    st7701s_reset();
-    st7701s_init_registers();
 
     /* Create the ESP-IDF RGB panel */
     esp_lcd_rgb_panel_config_t panel_cfg = {

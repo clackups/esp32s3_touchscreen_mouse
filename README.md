@@ -26,12 +26,11 @@ The user interacts with a navigation area drawn on the touchscreen:
 
 | Device | Display | Touch |
 |---|---|---|
-| Guition ESP32-4848S040C_I | ST7701S 480x480 (16-bit RGB) | GT911 (I2C) |
+| VIEWE UEDX80480043E-WB-A | ST7262 800x480 (16-bit RGB565) | GT911 (I2C) |
 
 Links:
-- https://www.guition.com/esp32-display-module/4-inch-esp32s3-display-module
-- https://devices.esphome.io/devices/guition-esp32-s3-4848s040
-- https://github.com/alaltitov/Guition-ESP32-S3-4848S040
+- https://viewedisplay.com/product/esp32-4-3-inch-800x480-rgb-ips-tft-display-touch-screen-arduino-lvgl/
+- https://github.com/VIEWESMART/UEDX80480043ESP32-4.3inch-Touch-Display
 
 ## Building
 
@@ -57,7 +56,7 @@ All options live under the **TOUCHSCREEN MOUSE** menu:
 
 | Option | Default | Description |
 |---|---|---|
-| Target device | Guition 4848S040 | Hardware pinout selection |
+| Target device | VIEWE UEDX80480043E-WB-A | Hardware pinout selection |
 | Side panel position | Right | Which screen edge holds the buttons |
 | Background color | 0x0000 (black) | RGB565 hex |
 | Outline color | 0x0010 (navy blue) | RGB565 hex |
@@ -74,15 +73,15 @@ All options live under the **TOUCHSCREEN MOUSE** menu:
 esp32s3_touchscreen_mouse/
 +-- AGENTS.md              contributor rules (ASCII-only policy, etc.)
 +-- CMakeLists.txt         ESP-IDF project root
-+-- Kconfig.projbuild      menuconfig options
 +-- sdkconfig.defaults     default SDK settings
 +-- partitions.csv         flash partition table
 +-- main/
     +-- CMakeLists.txt
+    +-- Kconfig.projbuild  menuconfig options
     +-- app_config.h       layout constants, color aliases
     +-- device_config.h    GPIO pin assignments per device
     +-- hid_mouse.h/.c     TinyUSB USB HID mouse
-    +-- display.h/.c       ST7701S RGB display + drawing primitives
+    +-- display.h/.c       RGB display + drawing primitives
     +-- touch.h/.c         GT911 I2C touch driver
     +-- ui.h/.c            navigation area, buttons, mode state machine
     +-- main.c             entry point, FreeRTOS tasks

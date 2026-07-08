@@ -3,15 +3,14 @@
  *
  * GT911 capacitive touch controller driver.
  *
- * The Guition ESP32-4848S040 board exposes the touch controller over I2C.
+ * The target board exposes the touch controller over I2C.
  * The controller stores its status and coordinates in a 16-bit register map.
  *
  * GT911 I2C address selection:
  *   The GT911 samples its INT pin at power-on to choose its I2C address.
  *   INT low  -> 0x5D,  INT high -> 0x14.
- *   On this board both RST and INT are left unconnected (NC); both addresses
- *   are tried at init time.  A full bus scan is performed on failure to aid
- *   diagnosis if the device is present at an unexpected address.
+ *   On this board RST/INT are not used by this firmware and both addresses
+ *   are tried at init time.
  */
 
 #include "touch.h"
@@ -109,12 +108,8 @@ static bool i2c_bus_recover(void)
      * SCL LOW  -> slave holding clock (unlikely without clock-stretch support)
      *             or line shorted to GND / missing pull-up.
      *
-     * GPIO 45 (SCL on Guition 4848S040) is an ESP32-S3 strapping pin; during
-     * boot it is sampled for VDDIO selection.  If an external pull-down is
-     * fitted for strapping purposes it will keep SCL at logic 0 even when the
-     * internal pull-up is enabled, making every I2C probe time out.  Check
-     * the level here -- before the I2C peripheral takes over -- so the fault
-     * is identified immediately rather than after 2 s of fruitless retries.
+     * Check line levels before the I2C peripheral takes over so wiring faults
+     * are identified immediately rather than after repeated probe timeouts.
      */
     int sda_level = gpio_get_level(TOUCH_I2C_SDA_GPIO);
     int scl_level = gpio_get_level(TOUCH_I2C_SCL_GPIO);

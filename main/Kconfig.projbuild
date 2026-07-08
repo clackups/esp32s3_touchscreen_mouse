@@ -2,20 +2,19 @@ menu "TOUCHSCREEN MOUSE"
 
     choice DEVICE_SELECTION
         prompt "Target device"
-        default DEVICE_GUITION_4848S040
+        default DEVICE_VIEWE_UEDX80480043E_WB_A
         help
             Select the ESP32-S3 board with touchscreen display that will be
             used as the USB mouse HID device.
 
-        config DEVICE_GUITION_4848S040
-            bool "Guition ESP32-4848S040C_I (4-inch 480x480)"
+        config DEVICE_VIEWE_UEDX80480043E_WB_A
+            bool "VIEWE UEDX80480043E-WB-A (4.3-inch 800x480)"
             help
-                Guition ESP32-S3-4848S040C_I: 4-inch 480x480 TFT with
-                ST7701S RGB display and GT911 capacitive touch controller.
+                VIEWE UEDX80480043E-WB-A: 4.3-inch 800x480 TFT with
+                ST7262 RGB display and GT911 capacitive touch controller.
                 References:
-                  https://www.guition.com/esp32-display-module/4-inch-esp32s3-display-module
-                  https://devices.esphome.io/devices/guition-esp32-s3-4848s040
-                  https://github.com/alaltitov/Guition-ESP32-S3-4848S040
+                  https://viewedisplay.com/product/esp32-4-3-inch-800x480-rgb-ips-tft-display-touch-screen-arduino-lvgl/
+                  https://github.com/VIEWESMART/UEDX80480043ESP32-4.3inch-Touch-Display
     endchoice
 
     choice BUTTON_PANEL_SIDE

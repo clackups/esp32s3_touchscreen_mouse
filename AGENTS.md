@@ -34,16 +34,16 @@
 esp32s3_touchscreen_mouse/
 +-- AGENTS.md              (this file)
 +-- CMakeLists.txt         (ESP-IDF project root)
-+-- Kconfig.projbuild      (menuconfig options: device, colors)
 +-- sdkconfig.defaults     (default SDK settings)
 +-- partitions.csv         (flash partition table)
 +-- README.md
 +-- main/
     +-- CMakeLists.txt
+    +-- Kconfig.projbuild  (menuconfig options: device, colors)
     +-- app_config.h       (layout constants, color aliases from Kconfig)
     +-- device_config.h    (GPIO pin assignments per device)
     +-- hid_mouse.h/.c     (TinyUSB USB HID mouse)
-    +-- display.h/.c       (ST7701S RGB display + drawing primitives)
+    +-- display.h/.c       (RGB display + drawing primitives)
     +-- touch.h/.c         (GT911 I2C touch driver)
     +-- ui.h/.c            (UI logic: navigation area, buttons, modes)
     +-- main.c             (entry point, FreeRTOS tasks)
@@ -54,14 +54,13 @@ esp32s3_touchscreen_mouse/
 1. Add a new `config DEVICE_xxx` option in `Kconfig.projbuild`.
 2. Add an `#elif defined(CONFIG_DEVICE_xxx)` block in `main/device_config.h`
    with the correct GPIO pin assignments and display timing parameters.
-3. Adjust the ST7701S init sequence in `main/display.c` if the panel needs
-   different register values.
+3. Adjust RGB panel configuration/timing in `main/display.c` as needed.
 4. Rebuild and test.
 
 ## Adding or Changing Colors
 
 All colors are RGB565 (16-bit) integers. Change the defaults in
-`Kconfig.projbuild` or override them at build time with:
+`main/Kconfig.projbuild` or override them at build time with:
 
     idf.py menuconfig
 
