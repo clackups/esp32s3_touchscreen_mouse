@@ -59,9 +59,10 @@ static i2c_master_dev_handle_t s_i2c_dev = NULL;
  *
  * Reference: I2C specification rev.6 section 3.1.16 (bus-stuck recovery).
  *
- * Returns true if the bus is free (SDA HIGH) after recovery, false if SDA
- * remains LOW (indicating a hardware problem: missing pull-ups, short to GND,
- * or touch controller not powered).
+ * Returns true if both SDA and SCL are HIGH after recovery, false if either
+ * line remains LOW (indicating a hardware problem: missing pull-ups, line
+ * shorted to GND, external strapping pull-down on SCL, or touch controller
+ * not powered).
  */
 static bool i2c_bus_recover(void)
 {
@@ -101,21 +102,33 @@ static bool i2c_bus_recover(void)
     vTaskDelay(pdMS_TO_TICKS(1));
 
     /*
-     * Read the actual SDA pin level.  With internal pull-up and no device
-     * pulling the line low, SDA must be HIGH.  If it is still LOW the bus is
-     * hardware-stuck (no external pull-ups, line shorted to GND, or touch
-     * controller unpowered) and no amount of software retries will help.
+     * Read both bus lines.  With internal pull-ups enabled and no external
+     * device holding either line low, both SDA and SCL must be HIGH.
+     *
+     * SDA LOW  -> slave stuck mid-byte (recovery failed) or short to GND.
+     * SCL LOW  -> slave holding clock (unlikely without clock-stretch support)
+     *             or line shorted to GND / missing pull-up.
+     *
+     * GPIO 45 (SCL on Guition 4848S040) is an ESP32-S3 strapping pin; during
+     * boot it is sampled for VDDIO selection.  If an external pull-down is
+     * fitted for strapping purposes it will keep SCL at logic 0 even when the
+     * internal pull-up is enabled, making every I2C probe time out.  Check
+     * the level here -- before the I2C peripheral takes over -- so the fault
+     * is identified immediately rather than after 2 s of fruitless retries.
      */
     int sda_level = gpio_get_level(TOUCH_I2C_SDA_GPIO);
-    if (sda_level == 0) {
-        ESP_LOGE(TAG, "I2C SDA stuck LOW after bus recovery "
+    int scl_level = gpio_get_level(TOUCH_I2C_SCL_GPIO);
+
+    if (sda_level == 0 || scl_level == 0) {
+        ESP_LOGE(TAG, "I2C bus stuck after recovery: SDA=%d SCL=%d "
                  "(SDA=GPIO%d SCL=GPIO%d) -- "
                  "check pull-ups, wiring and touch controller power",
+                 sda_level, scl_level,
                  TOUCH_I2C_SDA_GPIO, TOUCH_I2C_SCL_GPIO);
         return false;
     }
 
-    ESP_LOGD(TAG, "I2C bus free after recovery (SDA HIGH)");
+    ESP_LOGD(TAG, "I2C bus free after recovery (SDA HIGH, SCL HIGH)");
     return true;
 }
 
@@ -223,29 +236,6 @@ static int gt911_probe_address(uint8_t addr)
     return 0;
 }
 
-/*
- * gt911_scan_bus
- *
- * Scan all standard I2C addresses and log every device that ACKs.  Called
- * only when normal GT911 detection fails, to help diagnose wiring issues
- * (wrong address, bus stuck, no pull-ups, wrong GPIO assignment).
- */
-static void gt911_scan_bus(void)
-{
-    ESP_LOGW(TAG, "Scanning I2C bus for devices (SDA=%d SCL=%d)...",
-             TOUCH_I2C_SDA_GPIO, TOUCH_I2C_SCL_GPIO);
-    bool found = false;
-    for (uint8_t a = 0x01; a < 0x78; a++) {
-        if (i2c_master_probe(s_i2c_bus, a, I2C_PROBE_TIMEOUT_MS) == ESP_OK) {
-            ESP_LOGW(TAG, "  I2C device at 0x%02X", a);
-            found = true;
-        }
-    }
-    if (!found) {
-        ESP_LOGE(TAG, "  No I2C devices found -- check SDA/SCL wiring and pull-ups");
-    }
-}
-
 /* ======================================================================
  * Public API
  * ====================================================================== */
@@ -257,8 +247,10 @@ int touch_init(void)
     /* Recover the I2C bus before creating the master.  If the MCU was warm-
      * reset while the GT911 was mid-transaction the device may be holding SDA
      * low; the recovery sequence unblocks it before we set up the peripheral.
-     * If SDA is still LOW after recovery the bus is hardware-stuck -- bail out
-     * immediately rather than waiting through many fruitless probe timeouts. */
+     * Both SDA and SCL are checked after recovery -- if either is still LOW
+     * the bus is hardware-stuck (missing pull-ups, line shorted, strapping
+     * pull-down on SCL, or touch controller not powered) and no amount of
+     * software retries will help. */
     if (!i2c_bus_recover()) {
         return -1;
     }
@@ -297,7 +289,6 @@ int touch_init(void)
     if (!detected) {
         ESP_LOGE(TAG, "Could not detect GT911 at 0x%02X or 0x%02X",
                  TOUCH_I2C_ADDR_1, TOUCH_I2C_ADDR_2);
-        gt911_scan_bus();
         return -1;
     }
 
